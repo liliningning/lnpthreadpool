@@ -38,6 +38,18 @@ typedef struct threadpool_t
     int queuetail;
 
 
+    /* 条件变量 */
+
+    /* 锁的条件变量 */
+    pthread_mutex_t mutexpool;
+
+    /* 任务队列有东西可拿 */
+    pthread_cond_t notEmpty;
+
+    /* 的填充东西进任务队列 */
+    pthread_cond_t notFull;
+
+
 } threadpool_t;
 
 
