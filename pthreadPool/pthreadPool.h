@@ -26,9 +26,9 @@ typedef struct threadpool_t
 
 
 /* 线程函数的初始化 */
-int threadPoolInit (pthread_t * pool, int minthreadSize, int maxthreadSize);
+int threadPoolInit (threadpool_t * pool, int minthreadSize, int maxthreadSize);
 
 /* 线程的销毁 */
-int theeadPoolDstory(pthread_t * pool);
+int theeadPoolDstory(threadpool_t * pool);
 
 #endif
