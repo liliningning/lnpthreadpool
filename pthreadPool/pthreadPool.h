@@ -17,6 +17,9 @@ typedef struct threadpool_t
     /* 线程池里面有多少的线程 */
     pthread_t * threradId;
 
+    /* 线程中的管理者 */
+    pthread_t  mangerthreadId;
+
     /* 最小线程数 */
     int minthreadSize;
     /* 最大线程数 */
@@ -27,6 +30,9 @@ typedef struct threadpool_t
 
     /* 存活的线程数 */
     int liveThreadNums;
+
+    /* 离开的线程数 */
+    int exitThreadNums;
 
 
     /* 创建任务队列 */

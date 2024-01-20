@@ -3,12 +3,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <error.h>
+#include <unistd.h>
 
 #define MIN_PTHREAD 3
-
+#define MINMUM_EXPANSION 3
 #define MAX_PTHREAD 10
 
 #define QUEUE_CAPACITY 100
+
+
+
 enum STATUS_CODE
 {
     ON_SUCESS,
@@ -22,6 +26,8 @@ enum STATUS_CODE
 /* 工作的线程 */
 static void *threadFunc(void *arg);
 
+/* 管理者线程 */
+static void *mangerFunc(void *arg);
 /**************静态函数的实现***********************/
 
 /* 消费者函数 */
@@ -59,6 +65,77 @@ static void *threadFunc(void *arg)
             pool->busyThreadNums--;
             pthread_mutex_unlock(&(pool->busymutex));
         }
+    }
+    pthread_exit(NULL);
+}
+
+/* 管理线程的扩容和缩容 */
+/* 管理者线程 */
+static void *mangerFunc(void *arg)
+{
+
+    threadpool_t *pool = (threadpool_t *)arg;
+    while (1)
+    {
+        /* 每5s维护一次 */
+        sleep(5);
+
+        pthread_mutex_lock(&(pool->mutexpool));
+        /* 当前的任务数 */
+        int nowTaskNums = pool->queueSize;
+        /* 当前存活的任务数 */
+        int nowLiveNums = pool->liveThreadNums;
+        pthread_mutex_unlock(&(pool->mutexpool));
+
+        pthread_mutex_lock(&(pool->busymutex));
+        /* 当前忙碌的线程数 */
+        int nowBusyNums = pool->busyThreadNums;
+        pthread_mutex_unlock(&(pool->busymutex));
+
+        /* 扩容 */
+        /* 当任务数 > 存活的线程数  需要扩大存活的线程的数量 （要创建新的容量）但是不能超过最大的容量 */
+        if(nowTaskNums > nowLiveNums   && nowLiveNums < pool->maxthreadSize)
+        {
+
+                pthread_mutex_lock(&(pool->mutexpool));
+
+            /*每次添加的最小的线程数量  */
+            int count = 0;
+            
+            for(int idx = 0; idx < pool->maxthreadSize  &&  count <= MINMUM_EXPANSION && nowLiveNums <= pool->maxthreadSize; idx++)
+            {
+                int ret  = 0;
+                ret = pthread_create(&(pool->threradId), NULL, threadFunc, pool);
+                if(ret != 0)
+                {
+                    perror(" 扩容创建的线程失败");
+                    exit(-1);
+                }
+                count++;
+                pool->liveThreadNums++;
+            }
+             pthread_mutex_unlock(&(pool->mutexpool));
+        }
+
+
+
+        /* 缩容 */
+        /* 忙的任务数 * 2  < 存活的线程数   需要减少线程的数量   但是不能小于最小的容量 */
+        if( (nowBusyNums << 1) < nowLiveNums && nowLiveNums > pool->minthreadSize)
+        {
+
+            pthread_mutex_lock(&(pool->mutexpool));
+
+            pool->exitThreadNums = MINMUM_EXPANSION;
+
+            for(int idx = 0; idx < MINMUM_EXPANSION; idx++)
+            {
+                pthread_cond_signal(&(pool->notEmpty));
+            }
+            pthread_mutex_unlock(&(pool->mutexpool));
+
+        }
+
     }
     pthread_exit(NULL);
 }
@@ -129,10 +206,17 @@ int threadPoolInit(threadpool_t *pool, int minthreadSize, int maxthreadSize, int
         /* 清除脏数据 */
         memset(pool->threradId, 0, sizeof(threadpool_t) * pool->maxthreadSize);
 
+        int ret = pthread_create(&(pool->mangerthreadId), NULL, mangerFunc, pool);
+        if(ret != 0)
+        {
+            perror("manger thread create error");
+            break;
+        }
+
         /* 创建线程池里面的线程 */
         for (int idx = 0; idx < pool->minthreadSize; idx++)
         {
-            int ret = pthread_create(&(pool->threradId[idx]), NULL, threadFunc, NULL);
+            int ret = pthread_create(&(pool->threradId[idx]), NULL, threadFunc, pool);
             if (ret != 0)
             {
                 perror("pthread create  error ");
