@@ -48,6 +48,9 @@ typedef struct threadpool_t
     /* 队尾 -> 取出数据 */
     int queuetail;
 
+    /* 需要销毁的线程的标志位 要销毁为1 不销毁为0  */
+    int destorynum ;
+
     
 
 

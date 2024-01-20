@@ -28,6 +28,11 @@ static void *threadFunc(void *arg);
 
 /* 管理者线程 */
 static void *mangerFunc(void *arg);
+
+/* 线程的退出 */
+static void * pthreadExit(threadpool_t * pool);
+
+
 /**************静态函数的实现***********************/
 
 /* 消费者函数 */
@@ -138,6 +143,28 @@ static void *mangerFunc(void *arg)
 
     }
     pthread_exit(NULL);
+}
+
+
+/* 线程的退出 */
+static void * pthreadExit(threadpool_t * pool)
+{
+    if(pool ==  NULL)
+    {
+        return NULL_PTR;
+    }
+
+
+    for(int idx = 0; idx < pool->maxthreadSize; idx++)
+    {
+        if(pool->threradId[idx] == pthread_self())
+        {
+
+            pool->threradId[idx] = 0;
+            break;
+        }
+    }
+
 }
 
 /* 线程函数的初始化 */
@@ -287,4 +314,46 @@ int threadAdd(threadpool_t *pool, void *(worker_hander)(void *arg), void *arg)
 /* 线程的销毁 */
 int theeadPoolDstory(threadpool_t *pool)
 {
+    if(pool == NULL)
+    {
+        return NULL_PTR;
+    }
+
+    pool->destorynum = 1;
+
+    pthread_join(pool->mangerthreadId, NULL);
+
+    for(int idx = 0; idx < pool->liveThreadNums; idx++)
+    {
+        pthread_cond_signal(&pool->notEmpty);
+    }
+    if(pool->taskQueue)
+    {
+        free(pool->taskQueue);
+        pool->taskQueue = NULL;
+
+    }
+
+    if(pool->threradId)
+    {
+        free(pool->threradId);
+        pool->threradId = NULL;
+    }
+
+     /* 释放锁和条件变量的资源*/
+    pthread_mutex_destroy(&(pool->busymutex));
+    pthread_mutex_destroy(&(pool->mutexpool));
+    pthread_cond_destroy(&(pool->notFull));
+    pthread_cond_destroy(&(pool->notEmpty));
+
+    if(pool != NULL)
+    {
+        free(pool);
+        pool = NULL;
+    }
+
+    return ON_SUCESS;
+
+
+
 }
