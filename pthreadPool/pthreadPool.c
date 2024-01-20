@@ -43,10 +43,27 @@ static void *threadFunc(void *arg)
     {
         /* 等一个线程进去就上锁 */
         pthread_mutex_lock(&(pool->mutexpool));
-        while (pool->queueSize == 0)
+        while (pool->queueSize == 0 && pool->destorynum == 0 )
         {
             /* 等待生产者发送的条件变量 */
             pthread_cond_wait(&(pool->notEmpty), &(pool->mutexpool));
+
+            if(pool->exitThreadNums > 0)
+            {
+                pool->exitThreadNums--;
+            }
+            if(pool->liveThreadNums > pool->minthreadSize)
+            {
+                pthreadExit(pool);
+            }
+
+        }
+
+        if(pool->destorynum == 1)
+        {
+            pthread_mutex_unlock(&pool->mutexpool);
+            pthreadExit(pool);
+        }
 
             /* 有任务取任务 然后任务数减少  */
             task_t temtask = pool->taskQueue[pool->queuehead];
@@ -69,10 +86,12 @@ static void *threadFunc(void *arg)
             pthread_mutex_lock(&(pool->busymutex));
             pool->busyThreadNums--;
             pthread_mutex_unlock(&(pool->busymutex));
+     
         }
-    }
     pthread_exit(NULL);
-}
+    }
+    
+
 
 /* 管理线程的扩容和缩容 */
 /* 管理者线程 */
@@ -80,7 +99,7 @@ static void *mangerFunc(void *arg)
 {
 
     threadpool_t *pool = (threadpool_t *)arg;
-    while (1)
+    while (pool->destorynum == 0)
     {
         /* 每5s维护一次 */
         sleep(5);
