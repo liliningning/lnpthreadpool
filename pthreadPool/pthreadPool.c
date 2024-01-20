@@ -7,6 +7,7 @@
 
 #define MAX_PTHREAD 10
 
+#define QUEUE_CAPACITY 100
 enum STATUS_CODE
 {
     ON_SUCESS,
@@ -15,19 +16,15 @@ enum STATUS_CODE
 
 };
 
-/*************静态函数前置声明****************/
+/*************静态函数前置声明*******************/
 
 /* 工作的线程 */
-static void *  threadFunc(void * arg);
+static void *threadFunc(void *arg);
 
-
-
-
-
-
+/**************静态函数的实现***********************/
 
 /* 线程函数的初始化 */
-int threadPoolInit(threadpool_t *pool, int minthreadSize, int maxthreadSize)
+int threadPoolInit(threadpool_t *pool, int minthreadSize, int maxthreadSize, int queueCapacity)
 {
     if (pool == NULL)
     {
@@ -44,27 +41,64 @@ int threadPoolInit(threadpool_t *pool, int minthreadSize, int maxthreadSize)
     pool->minthreadSize = minthreadSize;
     pool->maxthreadSize = maxthreadSize;
 
-    /* 给id 开辟空间 */
-
-    pool->threradId = (threadpool_t *)malloc(sizeof(threadpool_t) * maxthreadSize);
-    if (pool->threradId == NULL)
+    do
     {
-        return MALLOC_ERROR;
-    }
+        /* 任务队列的容量判断 */
+        if (queueCapacity <= 0)
+        {
+            queueCapacity = QUEUE_CAPACITY;
+        }
+        /* 初始化任务队列的参数 */
+        pool->queueCapacity = queueCapacity;
+        pool->queueSize = 0;
+        pool->queuehead = 0;
+        pool->queuetail = 0;
 
-    /* 清除脏数据 */
-    memset(pool->threradId, 0, sizeof(threadpool_t) * maxthreadSize);
+        /*给任务队列开辟空间 */
+        pool->taskQueue = (task_t *)malloc(sizeof(task_t) * pool->queueCapacity);
+        if(pool->taskQueue == NULL)
+        {
+            return MALLOC_ERROR;
+        }
 
-    /* 创建线程池里面的线程 */
-    int ret = pthread_create(&(pool->threradId), NULL, threadFunc, NULL);
-    if (ret != 0)
-    {
-        perror("pthread error ");
-    }
+        memset(pool->taskQueue, 0, sizeof(task_t) * pool->queueCapacity);
 
+        /* 给id 开辟空间 */
+        pool->threradId = (threadpool_t *)malloc(sizeof(threadpool_t) * pool->maxthreadSize);
+        if (pool->threradId == NULL)
+        {
+            return MALLOC_ERROR;
+        }
 
-    /* 回收线程资源*/
-    pthread_join(&pool->threradId , NULL);
+        /* 清除脏数据 */
+        memset(pool->threradId, 0, sizeof(threadpool_t) * pool->maxthreadSize);
+
+        /* 创建线程池里面的线程 */
+        for (int idx = 0; idx < pool->minthreadSize; idx++)
+        {
+            int ret = pthread_create(&(pool->threradId[idx]), NULL, threadFunc, NULL);
+            if (ret != 0)
+            {
+                perror("pthread create  error ");
+                break;
+            }
+        }
+        /* 回收线程资源*/
+        for (int idx = 0; idx < pool->minthreadSize; idx++)
+        {
+            if (pool->threradId[idx] != 0)
+            {
+                pthread_join(&pool->threradId[idx], NULL);
+            }
+        }
+
+        /* 释放创建线程id时开辟的空间 */
+        if (pool->threradId != NULL)
+        {
+            free(pool->threradId);
+            pool->threradId = NULL;
+        }
+    } while (0);
 }
 /* 线程的销毁 */
 int theeadPoolDstory(threadpool_t *pool)

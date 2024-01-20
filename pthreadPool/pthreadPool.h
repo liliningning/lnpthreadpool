@@ -4,6 +4,12 @@
 #include <pthread.h>
 
 
+typedef struct task_t
+{
+    void * (*worker_hander)(void * arg);
+    void * arg;
+
+} task_t;
 
 
 typedef struct threadpool_t
@@ -18,6 +24,20 @@ typedef struct threadpool_t
     int maxthreadSize;
 
 
+    /* 创建任务队列 */
+
+    /* 任务队列 */
+    task_t * taskQueue;
+    /* 任务队列的容量*/
+    int queueCapacity;
+    /* 任务里面的任务数*/
+    int queueSize;
+    /* 队头 -> 放入数据 */
+    int queuehead;
+    /* 队尾 -> 取出数据 */
+    int queuetail;
+
+
 } threadpool_t;
 
 
@@ -26,7 +46,7 @@ typedef struct threadpool_t
 
 
 /* 线程函数的初始化 */
-int threadPoolInit (threadpool_t * pool, int minthreadSize, int maxthreadSize);
+int threadPoolInit (threadpool_t * pool, int minthreadSize, int maxthreadSize, int queueCapacity);
 
 /* 线程的销毁 */
 int theeadPoolDstory(threadpool_t * pool);
